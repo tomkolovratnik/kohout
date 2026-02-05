@@ -15,6 +15,7 @@ jobs:
           node-version: '25'
 
       - run: npm install --ignore-scripts
+      - run: rm -f shared/tsconfig.tsbuildinfo client/tsconfig.tsbuildinfo
       - run: npm run build
 
       - uses: actions/upload-artifact@v4
