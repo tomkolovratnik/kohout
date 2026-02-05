@@ -135,8 +135,10 @@ router.post('/providers/:id/test', async (req, res, next) => {
     }
 
     res.json({ success });
-  } catch (err) {
-    next(err);
+  } catch (err: any) {
+    const cause = err.cause;
+    const detail = cause?.message || cause || err.message;
+    res.json({ success: false, error: String(detail) });
   }
 });
 

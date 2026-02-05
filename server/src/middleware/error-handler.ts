@@ -17,7 +17,8 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
-  console.error('Error:', err.message);
+  const cause = (err as any).cause;
+  console.error('Error:', err.message, cause ? `\n  Cause: ${cause.message || cause}` : '');
 
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
