@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+
+      - run: npm install
+      - run: npm run build
+
+      - name: Create portable release
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path kohout/server -Force | Out-Null
+          New-Item -ItemType Directory -Path kohout/client -Force | Out-Null
+
+          # Copy built artifacts
+          Copy-Item -Recurse server/dist kohout/server/dist
+          Copy-Item server/package.json kohout/server/
+          Copy-Item -Recurse client/dist kohout/client/dist
+
+          # Production package.json
+          @'
+          {
+            "name": "kohout",
+            "private": true,
+            "dependencies": {
+              "better-sqlite3": "^11.7.0",
+              "cors": "^2.8.5",
+              "dotenv": "^16.4.0",
+              "express": "^5.1.0",
+              "zod": "^3.24.0"
+            }
+          }
+          '@ | Set-Content -Encoding utf8 kohout/package.json
+
+          # Install production deps
+          Push-Location kohout
+          npm install --omit=dev
+          Pop-Location
+
+          # Start script
+          @'
+          @echo off
+          title Kohout
+          echo Starting Kohout on http://localhost:3001
+          node server\dist\index.js
+          pause
+          '@ | Set-Content -Encoding ascii kohout/start.bat
+
+          # Zip
+          Compress-Archive -Path kohout -DestinationPath kohout-windows-x64.zip
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: kohout-windows-x64.zip
+          body: |
+            ## Instalace (Windows)
+
+            1. Stahni `kohout-windows-x64.zip`
+            2. Rozbal kamkoliv
+            3. Spust `start.bat`
+            4. Otevri http://localhost:3001
+
+            Vyzaduje Node.js 25.
