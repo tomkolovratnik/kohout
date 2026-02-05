@@ -38,7 +38,7 @@ jobs:
             "name": "kohout",
             "private": true,
             "dependencies": {
-              "sql.js-fts5": "^1.11.0",
+              "sql.js-fts5": "^1.4.0",
               "cors": "^2.8.5",
               "dotenv": "^16.4.0",
               "express": "^5.1.0",
