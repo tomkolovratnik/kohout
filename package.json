@@ -1,15 +1,18 @@
 {
   "name": "kohout",
   "version": "1.0.0",
-  "private": true,
   "workspaces": [
     "shared",
     "server",
     "client"
   ],
+  "bin": {
+    "kohout": "bin/kohout.js"
+  },
   "scripts": {
     "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w shared && npm run build -w client && npm run build -w server",
+    "prepare": "npm run build",
     "start": "node server/dist/index.js",
     "lint": "eslint . --ext .ts,.tsx"
   },

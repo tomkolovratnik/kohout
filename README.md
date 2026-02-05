@@ -10,17 +10,16 @@ Osobní nástroj pro agregaci ticketů z Jira a Azure DevOps. Importuje tickety 
 
 ## Instalace na novém PC
 
+Jeden příkaz — nainstaluje závislosti, zbuilduje a přidá příkaz `kohout` do PATH:
+
 ```bash
-git clone https://github.com/<user>/kohout.git
-cd kohout
-npm install
-npm run build
+npm install -g github:tomkolovratnik/kohout
 ```
 
-Hotovo. Spuštění:
+Spuštění:
 
 ```bash
-npm start
+kohout
 ```
 
 Aplikace poběží na `http://localhost:3001`.
@@ -28,10 +27,17 @@ Aplikace poběží na `http://localhost:3001`.
 ### Aktualizace
 
 ```bash
+npm install -g github:tomkolovratnik/kohout
+```
+
+### Alternativa bez globální instalace
+
+```bash
+git clone https://github.com/tomkolovratnik/kohout.git
 cd kohout
-git pull
 npm install
 npm run build
+npm start
 ```
 
 ### Konfigurace (volitelné)
@@ -47,38 +53,20 @@ Výchozí umístění databáze je `~/.kohout/kohout.db`.
 
 ---
 
-## Publikace repozitáře
-
-Jednorázově — vytvoří veřejný repozitář na GitHubu:
-
-```bash
-cd kohout
-git add -A
-git commit -m "Initial commit"
-gh repo create kohout --public --source=. --push
-```
-
-Pak na libovolném PC stačí `git clone` + `npm install` + `npm run build` (viz výše).
-
----
-
 ## Automatické spuštění po startu PC
 
 ### Windows — Task Scheduler
 
-Otevři PowerShell jako správce a spusť:
+Po globální instalaci (`npm install -g`) bude příkaz `kohout` v PATH. Otevři PowerShell jako správce:
 
 ```powershell
-$nodePath = (Get-Command node).Source
-$projectDir = "C:\Users\$env:USERNAME\kohout"
+$kohoutPath = (Get-Command kohout).Source
 
 schtasks /create /tn "Kohout" `
-  /tr "cmd /c cd /d $projectDir && $nodePath server\dist\index.js" `
+  /tr "$kohoutPath" `
   /sc onlogon `
   /rl highest
 ```
-
-Úprava cesty `$projectDir` dle skutečného umístění projektu.
 
 Správa:
 
