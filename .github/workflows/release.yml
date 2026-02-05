@@ -5,8 +5,8 @@ on:
     tags: ['v*']
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -15,22 +15,39 @@ jobs:
           node-version: '25'
 
       - run: npm install --ignore-scripts
-      - run: npm run build -w shared
-      - run: npx -w client vite build
-      - run: npm run build -w server
+      - run: npm run build
 
-      - name: Create portable release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            server/dist/
+            client/dist/
+
+  package-windows:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: kohout/
+
+      - name: Create portable package
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path kohout/server -Force | Out-Null
-          New-Item -ItemType Directory -Path kohout/client -Force | Out-Null
+          # server/package.json for ESM support
+          @'
+          {
+            "type": "module"
+          }
+          '@ | Set-Content -Encoding utf8 kohout/server/package.json
 
-          # Copy built artifacts
-          Copy-Item -Recurse server/dist kohout/server/dist
-          Copy-Item server/package.json kohout/server/
-          Copy-Item -Recurse client/dist kohout/client/dist
-
-          # Production package.json
+          # Root package.json with prod deps
           @'
           {
             "name": "kohout",
@@ -45,12 +62,10 @@ jobs:
           }
           '@ | Set-Content -Encoding utf8 kohout/package.json
 
-          # Install production deps
           Push-Location kohout
           npm install --omit=dev
           Pop-Location
 
-          # Start script
           @'
           @echo off
           title Kohout
@@ -59,7 +74,6 @@ jobs:
           pause
           '@ | Set-Content -Encoding ascii kohout/start.bat
 
-          # Zip
           Compress-Archive -Path kohout -DestinationPath kohout-windows-x64.zip
 
       - name: Create release
