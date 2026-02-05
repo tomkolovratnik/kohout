@@ -53,6 +53,7 @@ jobs:
           cat > kohout/start.bat << 'BAT'
           @echo off
           title Kohout
+          set NODE_TLS_REJECT_UNAUTHORIZED=0
           echo Starting Kohout on http://localhost:3001
           node server\dist\index.js
           pause
