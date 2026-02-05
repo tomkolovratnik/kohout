@@ -8,88 +8,75 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '25'
+          node-version: '22'
 
       - run: npm install --ignore-scripts
       - run: rm -f shared/tsconfig.tsbuildinfo client/tsconfig.tsbuildinfo
       - run: npm run build
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: build-output
-          path: |
-            server/dist/
-            client/dist/
-
-  package-windows:
-    needs: build
-    runs-on: windows-latest
-    steps:
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '25'
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: kohout/
-
       - name: Create portable package
-        shell: pwsh
         run: |
-          # server/package.json for ESM support
-          @'
-          {
-            "type": "module"
-          }
-          '@ | Set-Content -Encoding utf8 kohout/server/package.json
+          mkdir -p kohout/server kohout/client
+
+          # Built artifacts
+          cp -r server/dist kohout/server/dist
+          cp -r client/dist kohout/client/dist
+
+          # server/package.json for ESM
+          echo '{"type":"module"}' > kohout/server/package.json
 
           # Root package.json with prod deps
-          @'
+          cat > kohout/package.json << 'PKGJSON'
           {
             "name": "kohout",
             "private": true,
             "dependencies": {
-              "better-sqlite3": "^11.7.0",
+              "sql.js-fts5": "^1.11.0",
               "cors": "^2.8.5",
               "dotenv": "^16.4.0",
               "express": "^5.1.0",
               "zod": "^3.24.0"
             }
           }
-          '@ | Set-Content -Encoding utf8 kohout/package.json
+          PKGJSON
 
-          Push-Location kohout
-          npm install --omit=dev
-          Pop-Location
+          cd kohout && npm install --omit=dev && cd ..
 
-          @'
+          # Start scripts
+          cat > kohout/start.bat << 'BAT'
           @echo off
           title Kohout
           echo Starting Kohout on http://localhost:3001
           node server\dist\index.js
           pause
-          '@ | Set-Content -Encoding ascii kohout/start.bat
+          BAT
 
-          Compress-Archive -Path kohout -DestinationPath kohout-windows-x64.zip
+          cat > kohout/start.sh << 'SH'
+          #!/bin/sh
+          echo "Starting Kohout on http://localhost:3001"
+          node server/dist/index.js
+          SH
+          chmod +x kohout/start.sh
+
+          zip -r kohout-portable.zip kohout/
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: kohout-windows-x64.zip
+          files: kohout-portable.zip
           body: |
-            ## Instalace (Windows)
+            ## Instalace
 
-            1. Stahni `kohout-windows-x64.zip`
+            1. Stahni `kohout-portable.zip`
             2. Rozbal kamkoliv
-            3. Spust `start.bat`
+            3. Windows: spust `start.bat` / Linux: `./start.sh`
             4. Otevri http://localhost:3001
 
-            Vyzaduje Node.js 25.
+            Vyzaduje Node.js 20+.

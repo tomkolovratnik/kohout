@@ -1,11 +1,12 @@
 import 'dotenv/config';
 import { createApp } from './app.js';
-import { runMigrations, closeDb } from './db/connection.js';
+import { initDb, runMigrations, closeDb } from './db/connection.js';
 import { startPeriodicSync, stopPeriodicSync } from './services/sync-service.js';
 import { checkAndRebuildFts } from './services/ticket-service.js';
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
+await initDb();
 runMigrations();
 checkAndRebuildFts();
 
