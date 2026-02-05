@@ -1,6 +1,7 @@
 {
   "name": "kohout",
   "version": "1.0.0",
+  "description": "Personal ticket aggregation tool for Jira and Azure DevOps",
   "workspaces": [
     "shared",
     "server",
@@ -8,6 +9,19 @@
   ],
   "bin": {
     "kohout": "bin/kohout.js"
+  },
+  "files": [
+    "bin/",
+    "server/dist/",
+    "server/package.json",
+    "client/dist/"
+  ],
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^5.1.0",
+    "zod": "^3.24.0"
   },
   "scripts": {
     "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
