@@ -34,12 +34,12 @@ Single `types.ts` file exporting all domain types, API wrappers, and string lite
 
 ### Server (`@kohout/server`)
 
-Express 5 + better-sqlite3 + Zod validation.
+Express 5 + sql.js-fts5 (WASM SQLite) + Zod validation.
 
 - **Routes** (`src/routes/`) — 10 route files mounted at `/api/*` in `app.ts`
 - **Services** (`src/services/`) — `ticket-service.ts` (import, list, FTS index), `sync-service.ts` (periodic refresh, bulk import)
 - **Integrations** (`src/integrations/`) — Jira and Azure DevOps each have `client.ts` (REST API wrapper) + `mapper.ts` (normalize to ExternalTicket)
-- **Database** (`src/db/`) — SQLite with WAL mode, FTS5 full-text search, migration system (`_migrations` table, SQL files in `migrations/`)
+- **Database** (`src/db/`) — sql.js-fts5 (pure WASM, no native binaries), FTS5 full-text search, migration system (`_migrations` table, SQL files in `migrations/`). Compatibility wrapper (`SqlJsWrapper`) mimics better-sqlite3 API.
 - **Middleware** — `error-handler.ts` (AppError class, global catch), `validation.ts` (Zod schema middleware attaching to `req.validated`)
 
 DB location: `~/.kohout/kohout.db` (override with `DATABASE_PATH` env var).
@@ -82,3 +82,7 @@ React 19 + Vite 6 + Tailwind CSS v4 + TanStack Query + Zustand.
 - SQLite FTS5 for search with LIKE fallback if FTS query fails
 - Folder hierarchy uses recursive descent for folder IDs and ticket counts
 - Chunk size warning (~985KB JS bundle) is expected due to recharts + dnd-kit
+
+## Important: No Native Binaries
+
+App is distributed as portable zip via GitHub Releases. **Nikdy nepřidávat závislosti s nativními C/C++ binárkami** (např. better-sqlite3, sharp, bcrypt). Firemní antiviry na Windows blokují `.node` soubory extrahované ze stažených zipů (Mark of the Web). Proto se používá sql.js-fts5 (čistý WASM) místo better-sqlite3. Při volbě nových závislostí vždy preferovat pure JS/WASM alternativy.
