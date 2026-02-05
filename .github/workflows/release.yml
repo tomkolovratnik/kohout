@@ -15,7 +15,9 @@ jobs:
           node-version: '25'
 
       - run: npm install --ignore-scripts
-      - run: npm run build
+      - run: npm run build -w shared
+      - run: npx -w client vite build
+      - run: npm run build -w server
 
       - name: Create portable release
         shell: pwsh
