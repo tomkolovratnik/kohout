@@ -1,9 +1,10 @@
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useFiltersStore } from '@/stores/filters-store';
+import { useUiStore } from '@/stores/ui-store';
 import { useCategories } from '@/api/categories';
 import { useTags } from '@/api/tags';
-import { RotateCcw, FolderTree } from 'lucide-react';
+import { RotateCcw, FolderTree, LayoutList, LayoutGrid } from 'lucide-react';
 
 interface FilterBarProps {
   foldersPanelOpen?: boolean;
@@ -12,6 +13,8 @@ interface FilterBarProps {
 
 export function FilterBar({ foldersPanelOpen, onToggleFolders }: FilterBarProps = {}) {
   const { status, priority, provider_type, sort_by, sort_order, category_id, tag_id, setFilter, resetFilters } = useFiltersStore();
+  const ticketViewMode = useUiStore(s => s.ticketViewMode);
+  const setTicketViewMode = useUiStore(s => s.setTicketViewMode);
   const { data: categories = [] } = useCategories();
   const { data: tags = [] } = useTags();
 
@@ -22,6 +25,27 @@ export function FilterBar({ foldersPanelOpen, onToggleFolders }: FilterBarProps 
           <FolderTree className="h-4 w-4" />
         </Button>
       )}
+
+      <div className="flex items-center rounded-md ring-1 ring-border/40 shrink-0">
+        <Button
+          variant={ticketViewMode === 'cards' ? 'default' : 'ghost'}
+          size="icon"
+          className="h-9 w-9 rounded-r-none"
+          onClick={() => setTicketViewMode('cards')}
+          title="Kartové zobrazení"
+        >
+          <LayoutGrid className="h-4 w-4" />
+        </Button>
+        <Button
+          variant={ticketViewMode === 'compact' ? 'default' : 'ghost'}
+          size="icon"
+          className="h-9 w-9 rounded-l-none"
+          onClick={() => setTicketViewMode('compact')}
+          title="Kompaktní zobrazení"
+        >
+          <LayoutList className="h-4 w-4" />
+        </Button>
+      </div>
 
       <Select value={status} onChange={e => setFilter('status', e.target.value)}>
         <option value="">Všechny stavy</option>

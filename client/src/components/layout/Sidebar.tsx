@@ -19,42 +19,37 @@ export function Sidebar() {
   const ThemeIcon = themeIcons[mode];
 
   return (
-    <aside className="w-56 bg-sidebar-background flex flex-col h-full shadow-[1px_0_0_0_var(--color-border)]">
-      <div className="p-4 pb-3">
-        <div className="flex items-center gap-2">
-          <img src="/favicon.ico" alt="Kohout" className="h-6 w-6" />
-          <h1 className="text-lg font-bold tracking-tight font-heading">Kohout</h1>
-        </div>
-        <p className="text-xs text-muted-foreground mt-0.5">Správa tiketů</p>
+    <aside className="w-14 bg-sidebar-background flex flex-col items-center h-full shadow-[1px_0_0_0_var(--color-border)]">
+      <div className="py-3">
+        <img src="/favicon.ico" alt="Kohout" className="h-7 w-7" />
       </div>
-      <nav className="flex-1 p-2 space-y-0.5">
+      <nav className="flex-1 p-2 space-y-1 flex flex-col items-center">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.to === '/'}
+            title={item.label}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150',
+                'flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-150',
                 isActive
                   ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent/40 hover:text-foreground rounded-lg'
+                  : 'text-muted-foreground hover:bg-accent/40 hover:text-foreground'
               )
             }
           >
-            <item.icon className="h-4 w-4" />
-            {item.label}
+            <item.icon className="h-5 w-5" />
           </NavLink>
         ))}
       </nav>
       <div className="p-2">
         <button
           onClick={() => setTheme(themeCycle[mode])}
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-all duration-150 w-full"
+          className="flex items-center justify-center w-10 h-10 rounded-lg text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-all duration-150"
           title={`Režim: ${themeLabels[mode]}`}
         >
-          <ThemeIcon className="h-4 w-4" />
-          {themeLabels[mode]}
+          <ThemeIcon className="h-5 w-5" />
         </button>
       </div>
     </aside>
