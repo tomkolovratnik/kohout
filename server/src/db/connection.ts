@@ -27,11 +27,15 @@ export interface WrappedDatabase {
   exec(sql: string): void;
   pragma(pragma: string): any;
   close(): void;
+  flushSync(): void;
 }
 
 class SqlJsWrapper implements WrappedDatabase {
   private db: SqlJsDatabase;
   private dbPath: string;
+  private dirty = false;
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private static SAVE_DELAY_MS = 2000;
 
   constructor(db: SqlJsDatabase, dbPath: string) {
     this.db = db;
@@ -40,7 +44,7 @@ class SqlJsWrapper implements WrappedDatabase {
 
   prepare(sql: string): Statement {
     const db = this.db;
-    const save = () => this.save();
+    const scheduleSave = () => this.scheduleSave();
 
     return {
       all(...params: any[]): any[] {
@@ -72,7 +76,7 @@ class SqlJsWrapper implements WrappedDatabase {
         const lastInsertRowid = lastId.length > 0 ? Number(lastId[0].values[0][0]) : 0;
         const changesResult = db.exec('SELECT changes() as c');
         const changes = changesResult.length > 0 ? Number(changesResult[0].values[0][0]) : 0;
-        save();
+        scheduleSave();
         return { lastInsertRowid, changes };
       },
     };
@@ -80,7 +84,7 @@ class SqlJsWrapper implements WrappedDatabase {
 
   exec(sql: string): void {
     this.db.run(sql);
-    this.save();
+    this.scheduleSave();
   }
 
   pragma(pragma: string): any {
@@ -92,13 +96,27 @@ class SqlJsWrapper implements WrappedDatabase {
   }
 
   close(): void {
-    this.save();
+    this.flushSync();
     this.db.close();
   }
 
-  private save(): void {
+  /** Mark DB as dirty and schedule a debounced write */
+  private scheduleSave(): void {
+    this.dirty = true;
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => this.flushSync(), SqlJsWrapper.SAVE_DELAY_MS);
+  }
+
+  /** Immediately write to disk if there are pending changes */
+  flushSync(): void {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+    if (!this.dirty) return;
     const data = this.db.export();
     fs.writeFileSync(this.dbPath, Buffer.from(data));
+    this.dirty = false;
   }
 }
 

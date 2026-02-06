@@ -2,7 +2,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, X } from 'lucide-react';
 
 const priorityDotColors: Record<string, string> = {
   critical: 'bg-red-500',
@@ -21,18 +21,27 @@ export interface KanbanCardContentProps {
   assignee: string | null;
   isDragPlaceholder?: boolean;
   isOverlay?: boolean;
+  onRemove?: (e: React.MouseEvent) => void;
 }
 
-export function KanbanCardContent({ title, externalId, priority, providerType, assignee, isDragPlaceholder, isOverlay }: KanbanCardContentProps) {
+export function KanbanCardContent({ title, externalId, priority, providerType, assignee, isDragPlaceholder, isOverlay, onRemove }: KanbanCardContentProps) {
   return (
     <div
       className={cn(
-        'bg-card rounded-lg ring-1 ring-border/30 p-3 shadow-[var(--shadow-card)] transition-all duration-150',
+        'group/card bg-card rounded-lg ring-1 ring-border/30 p-3 shadow-[var(--shadow-card)] transition-all duration-150 relative',
         isDragPlaceholder && 'opacity-30 ring-dashed ring-primary/40 bg-primary/5 shadow-none',
         isOverlay && 'shadow-2xl ring-primary/50 rotate-[1.5deg] scale-[1.03]',
         !isDragPlaceholder && !isOverlay && 'hover:shadow-[var(--shadow-card-hover)]'
       )}
     >
+      {onRemove && !isDragPlaceholder && !isOverlay && (
+        <button
+          onClick={onRemove}
+          className="absolute top-1.5 right-1.5 h-5 w-5 rounded-md flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity bg-muted/80 hover:bg-destructive hover:text-destructive-foreground text-muted-foreground"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
       <div className="flex items-start gap-2">
         <div className="mt-0.5 shrink-0">
           <GripVertical className={cn('h-4 w-4', isOverlay ? 'text-primary' : 'text-muted-foreground')} />
@@ -65,9 +74,10 @@ interface KanbanCardProps {
   providerType: string;
   assignee: string | null;
   onCardClick?: (ticketId: number) => void;
+  onRemove?: (e: React.MouseEvent) => void;
 }
 
-export function KanbanCard({ id, ticketId, title, externalId, priority, providerType, assignee, onCardClick }: KanbanCardProps) {
+export function KanbanCard({ id, ticketId, title, externalId, priority, providerType, assignee, onCardClick, onRemove }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
   const style = {
@@ -90,6 +100,7 @@ export function KanbanCard({ id, ticketId, title, externalId, priority, provider
           providerType={providerType}
           assignee={assignee}
           isDragPlaceholder={isDragging}
+          onRemove={onRemove}
         />
       </div>
     </div>

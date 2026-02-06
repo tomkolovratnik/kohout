@@ -22,9 +22,10 @@ interface KanbanSwimlaneProps {
   showColumnHeaders?: boolean;
   isDragActive?: boolean;
   onCardClick?: (ticketId: number) => void;
+  onRemoveTicket?: (positionId: number) => void;
 }
 
-export function KanbanSwimlane({ swimlane, columns, tickets, showColumnHeaders = false, isDragActive = false, onCardClick }: KanbanSwimlaneProps) {
+export function KanbanSwimlane({ swimlane, columns, tickets, showColumnHeaders = false, isDragActive = false, onCardClick, onRemoveTicket }: KanbanSwimlaneProps) {
   const swimlaneId = swimlane?.id ?? null;
 
   return (
@@ -48,6 +49,7 @@ export function KanbanSwimlane({ swimlane, columns, tickets, showColumnHeaders =
             showHeader={showColumnHeaders}
             isDragActive={isDragActive}
             onCardClick={onCardClick}
+            onRemoveTicket={onRemoveTicket}
           />
         ))}
       </div>

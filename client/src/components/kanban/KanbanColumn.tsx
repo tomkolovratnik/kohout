@@ -25,9 +25,10 @@ interface KanbanColumnProps {
   showHeader?: boolean;
   isDragActive?: boolean;
   onCardClick?: (ticketId: number) => void;
+  onRemoveTicket?: (positionId: number) => void;
 }
 
-export function KanbanColumn({ column, tickets, swimlaneId, showHeader = false, isDragActive = false, onCardClick }: KanbanColumnProps) {
+export function KanbanColumn({ column, tickets, swimlaneId, showHeader = false, isDragActive = false, onCardClick, onRemoveTicket }: KanbanColumnProps) {
   const droppableId = `col-${column.id}-swim-${swimlaneId ?? 'none'}`;
   const { setNodeRef, isOver } = useDroppable({ id: droppableId });
 
@@ -72,6 +73,7 @@ export function KanbanColumn({ column, tickets, swimlaneId, showHeader = false, 
               providerType={ticket.provider_type}
               assignee={ticket.assignee}
               onCardClick={onCardClick}
+              onRemove={onRemoveTicket ? (e) => { e.stopPropagation(); onRemoveTicket(ticket.id); } : undefined}
             />
           ))}
         </SortableContext>

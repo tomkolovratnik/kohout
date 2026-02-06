@@ -94,6 +94,9 @@ export function FilterBar({ foldersPanelOpen, onToggleFolders }: FilterBarProps 
         <option value="created_at:asc">Nejstarší</option>
         <option value="priority:asc">Priorita</option>
         <option value="title:asc">Název A-Z</option>
+        <option value="title:desc">Název Z-A</option>
+        <option value="external_id:asc">Tiket vzestupně</option>
+        <option value="external_id:desc">Tiket sestupně</option>
       </Select>
 
       <Button variant="ghost" size="icon" onClick={resetFilters} title="Reset filtrů">

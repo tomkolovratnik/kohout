@@ -127,3 +127,12 @@ export function useMoveTicket() {
     onSuccess: (_, { boardId }) => qc.invalidateQueries({ queryKey: ['kanban-board', boardId] }),
   });
 }
+
+export function useRemoveTicketFromBoard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ positionId }: { positionId: number; boardId: number }) =>
+      apiFetch(`/kanban/tickets/${positionId}`, { method: 'DELETE' }),
+    onSuccess: (_, { boardId }) => qc.invalidateQueries({ queryKey: ['kanban-board', boardId] }),
+  });
+}

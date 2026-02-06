@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { DndContext, closestCenter, DragEndEvent, DragStartEvent, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { useKanbanBoard, useMoveTicket, useAddTicketToBoard } from '@/api/kanban';
+import { useKanbanBoard, useMoveTicket, useAddTicketToBoard, useRemoveTicketFromBoard } from '@/api/kanban';
 import { useTickets } from '@/api/tickets';
 import { KanbanSwimlane } from './KanbanSwimlane';
 import { KanbanConfig } from './KanbanConfig';
@@ -25,6 +25,7 @@ export function KanbanView({ boardId, configOpen, onConfigOpenChange, addTicketO
   const { data: board } = useKanbanBoard(boardId);
   const moveTicket = useMoveTicket();
   const addTicketToBoard = useAddTicketToBoard();
+  const removeTicketFromBoard = useRemoveTicketFromBoard();
   const [showConfigInternal, setShowConfigInternal] = useState(false);
   const [showAddTicketInternal, setShowAddTicketInternal] = useState(false);
   const showConfig = configOpen ?? showConfigInternal;
@@ -128,6 +129,13 @@ export function KanbanView({ boardId, configOpen, onConfigOpenChange, addTicketO
     setShowTicketDetail(true);
   };
 
+  const handleRemoveTicket = (positionId: number) => {
+    removeTicketFromBoard.mutate({ positionId, boardId }, {
+      onSuccess: () => toast.success('Tiket odebrán z nástěnky'),
+      onError: () => toast.error('Nepodařilo se odebrat tiket'),
+    });
+  };
+
   const hasSwimlanes = swimlanes.length > 0;
 
   return (
@@ -173,6 +181,7 @@ export function KanbanView({ boardId, configOpen, onConfigOpenChange, addTicketO
                       tickets={positions.filter(p => p.swimlane_id === sw.id)}
                       isDragActive={!!activeId}
                       onCardClick={handleCardClick}
+                      onRemoveTicket={handleRemoveTicket}
                     />
                   ))}
                   {/* Tickets without swimlane */}
@@ -183,6 +192,7 @@ export function KanbanView({ boardId, configOpen, onConfigOpenChange, addTicketO
                       tickets={positions.filter(p => p.swimlane_id === null)}
                       isDragActive={!!activeId}
                       onCardClick={handleCardClick}
+                      onRemoveTicket={handleRemoveTicket}
                     />
                   )}
                 </>
@@ -193,6 +203,7 @@ export function KanbanView({ boardId, configOpen, onConfigOpenChange, addTicketO
                   tickets={positions}
                   isDragActive={!!activeId}
                   onCardClick={handleCardClick}
+                  onRemoveTicket={handleRemoveTicket}
                 />
               )}
             </div>
