@@ -64,16 +64,6 @@ export async function fetchMyTickets(options: FetchMyTicketsRequest): Promise<Fe
   let externalIds: string[] = [];
 
   if (provider.type === 'jira') {
-    const conditions: string[] = [];
-    if (options.assigned) conditions.push('assignee = currentUser()');
-    if (options.watched) conditions.push('watcher = currentUser()');
-    if (options.participant) conditions.push('issue in participatedIssues()');
-
-    let jql = `(${conditions.join(' OR ')})`;
-    if (!options.include_closed) {
-      jql += ' AND status NOT IN (Done, Closed, Resolved)';
-    }
-
     const client = new JiraClient({
       base_url: provider.base_url,
       pat_token: provider.pat_token,
@@ -81,14 +71,39 @@ export async function fetchMyTickets(options: FetchMyTicketsRequest): Promise<Fe
       extra_config: extraConfig,
     });
 
-    let pageToken: string | undefined;
-    do {
-      const result = await client.searchIssues(jql, pageToken);
-      for (const issue of result.issues) {
-        externalIds.push(issue.key);
+    const statusFilter = options.include_closed ? '' : ' AND status NOT IN (Done, Closed, Resolved)';
+    const keySet = new Set<string>();
+
+    const runJqlSearch = async (jql: string) => {
+      let pageToken: string | undefined;
+      do {
+        const result = await client.searchIssues(jql, pageToken);
+        for (const issue of result.issues) {
+          keySet.add(issue.key);
+        }
+        pageToken = result.nextPageToken;
+      } while (pageToken);
+    };
+
+    // Standard conditions (assignee, watcher) — always safe
+    const conditions: string[] = [];
+    if (options.assigned) conditions.push('assignee = currentUser()');
+    if (options.watched) conditions.push('watcher = currentUser()');
+
+    if (conditions.length > 0) {
+      await runJqlSearch(`(${conditions.join(' OR ')})${statusFilter}`);
+    }
+
+    // "Request participants" exists only in JSM projects — run separately and skip on failure
+    if (options.participant) {
+      try {
+        await runJqlSearch(`"Request participants" = currentUser()${statusFilter}`);
+      } catch (err) {
+        console.warn('Participant query failed (field may not exist in this Jira instance):', (err as Error).message);
       }
-      pageToken = result.nextPageToken;
-    } while (pageToken);
+    }
+
+    externalIds = [...keySet];
   } else if (provider.type === 'azure-devops') {
     const conditions: string[] = [];
     if (options.assigned) conditions.push('[System.AssignedTo] = @Me');
