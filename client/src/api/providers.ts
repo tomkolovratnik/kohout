@@ -49,6 +49,9 @@ export function useFetchMyTickets() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tickets'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['folder-tree'] });
+      qc.invalidateQueries({ queryKey: ['ticket-tags'] });
+      qc.invalidateQueries({ queryKey: ['ticket-categories'] });
     },
   });
 }

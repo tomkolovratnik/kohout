@@ -10,9 +10,20 @@ import { useProviders } from '@/api/providers';
 import { useImportTicket } from '@/api/tickets';
 import { useTags } from '@/api/tags';
 import { useCategories } from '@/api/categories';
+import { useFolderTree } from '@/api/folders';
 import { apiFetch } from '@/api/client';
 import { toast } from 'sonner';
 import { Download, X } from 'lucide-react';
+import type { FolderTreeNode } from '@kohout/shared';
+
+function flattenTree(nodes: FolderTreeNode[], depth = 0): { id: number; name: string; depth: number }[] {
+  const result: { id: number; name: string; depth: number }[] = [];
+  for (const node of nodes) {
+    result.push({ id: node.id, name: node.name, depth });
+    result.push(...flattenTree(node.children, depth + 1));
+  }
+  return result;
+}
 
 const LAST_PROVIDER_KEY = 'kohout-last-provider';
 
@@ -40,9 +51,11 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
   const importTicket = useImportTicket();
   const { data: tags = [] } = useTags();
   const { data: categories = [] } = useCategories();
+  const { data: treeData } = useFolderTree();
 
   const [providerId, setProviderId] = useState('');
   const [externalId, setExternalId] = useState('');
+  const [folderId, setFolderId] = useState<string>('');
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [importing, setImporting] = useState(false);
@@ -59,6 +72,7 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
   useEffect(() => {
     if (!open) {
       setExternalId('');
+      setFolderId('');
       setSelectedTagIds([]);
       setSelectedCategoryIds([]);
       setImporting(false);
@@ -68,6 +82,7 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
 
   const availableTags = tags.filter((t: any) => !selectedTagIds.includes(t.id));
   const availableCategories = categories.filter((c: any) => !selectedCategoryIds.includes(c.id));
+  const flatFolders = treeData ? flattenTree(treeData.tree) : [];
 
   const handleImport = async () => {
     if (!providerId || !externalId.trim()) return;
@@ -106,6 +121,14 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
             });
           } catch {}
         }
+        if (folderId) {
+          try {
+            await apiFetch(`/tickets/${ticket.id}/folder`, {
+              method: 'PATCH',
+              body: JSON.stringify({ folder_id: Number(folderId) }),
+            });
+          } catch {}
+        }
 
         successCount++;
       } catch {
@@ -117,6 +140,7 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
     qc.invalidateQueries({ queryKey: ['tickets'] });
     if (selectedTagIds.length > 0) qc.invalidateQueries({ queryKey: ['ticket-tags'] });
     if (selectedCategoryIds.length > 0) qc.invalidateQueries({ queryKey: ['ticket-categories'] });
+    if (folderId) qc.invalidateQueries({ queryKey: ['folder-tree'] });
 
     // Summary toast
     if (failCount === 0) {
@@ -165,6 +189,17 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
               disabled={importing}
             />
             <p className="text-xs text-muted-foreground mt-1">Více oddělte čárkou nebo středníkem</p>
+          </div>
+
+          {/* Folder */}
+          <div>
+            <Label>Složka</Label>
+            <Select value={folderId} onChange={e => setFolderId(e.target.value)} disabled={importing}>
+              <option value="">-- Bez složky --</option>
+              {flatFolders.map(f => (
+                <option key={f.id} value={f.id}>{'\u00A0\u00A0'.repeat(f.depth) + f.name}</option>
+              ))}
+            </Select>
           </div>
 
           {/* Categories */}

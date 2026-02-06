@@ -7,14 +7,27 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useProviders, useCreateProvider, useDeleteProvider, useTestConnection, useFetchMyTickets } from '@/api/providers';
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory } from '@/api/categories';
 import { useTags, useCreateTag, useUpdateTag, useDeleteTag } from '@/api/tags';
+import { useFolderTree } from '@/api/folders';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { Plus, Trash2, CheckCircle, XCircle, Loader2, RefreshCw, Download, Info, Pencil, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiFetch } from '@/api/client';
+import type { FolderTreeNode } from '@kohout/shared';
+
+function flattenTree(nodes: FolderTreeNode[], depth = 0): { id: number; name: string; depth: number }[] {
+  const result: { id: number; name: string; depth: number }[] = [];
+  for (const node of nodes) {
+    result.push({ id: node.id, name: node.name, depth });
+    result.push(...flattenTree(node.children, depth + 1));
+  }
+  return result;
+}
 
 export function SettingsPage() {
   const { data: providers = [], isLoading } = useProviders();
@@ -214,22 +227,42 @@ export function SettingsPage() {
 }
 
 function FetchMyTicketsSection({ providerId, providerType }: { providerId: number; providerType: string }) {
+  const [mode, setMode] = useState<'my' | 'custom'>('my');
   const [assigned, setAssigned] = useState(true);
   const [watched, setWatched] = useState(false);
   const [participant, setParticipant] = useState(false);
   const [includeClosed, setIncludeClosed] = useState(false);
+  const [customQuery, setCustomQuery] = useState('');
+  const [folderId, setFolderId] = useState<string>('');
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const fetchMyTickets = useFetchMyTickets();
+  const { data: tags = [] } = useTags();
+  const { data: categories = [] } = useCategories();
+  const { data: treeData } = useFolderTree();
 
-  const noneSelected = !assigned && !watched && !participant;
+  const flatFolders = treeData ? flattenTree(treeData.tree) : [];
+  const availableTags = tags.filter((t: any) => !selectedTagIds.includes(t.id));
+  const availableCategories = categories.filter((c: any) => !selectedCategoryIds.includes(c.id));
+
+  const isAdo = providerType === 'azure-devops';
+  const isCustomMode = mode === 'custom';
+  const noneSelected = !isCustomMode && !assigned && !watched && !participant;
+  const customEmpty = isCustomMode && !customQuery.trim();
+  const canFetch = !noneSelected && !customEmpty;
 
   const handleFetch = async () => {
     try {
       const result = await fetchMyTickets.mutateAsync({
         provider_id: providerId,
-        assigned,
-        watched,
-        participant,
-        include_closed: includeClosed,
+        assigned: isCustomMode ? false : assigned,
+        watched: isCustomMode ? false : watched,
+        participant: isCustomMode ? false : participant,
+        include_closed: isCustomMode ? false : includeClosed,
+        custom_query: isCustomMode ? customQuery.trim() : undefined,
+        folder_id: folderId ? Number(folderId) : undefined,
+        tag_ids: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+        category_ids: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
       });
       toast.success(`Načteno: ${result.imported} nových, ${result.updated} aktualizovaných, ${result.failed} selhalo (z celkem ${result.total})`);
     } catch (e: any) {
@@ -237,40 +270,142 @@ function FetchMyTicketsSection({ providerId, providerType }: { providerId: numbe
     }
   };
 
-  const isAdo = providerType === 'azure-devops';
-
   return (
     <div className="mt-4 pt-4 border-t">
-      <h4 className="text-sm font-medium mb-3">Načíst moje tikety</h4>
-      <div className="space-y-2">
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox" checked={assigned} onChange={e => setAssigned(e.target.checked)} className="rounded" />
-          Přiřazené mně
-        </label>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox" checked={watched} onChange={e => setWatched(e.target.checked)} className="rounded" />
-          Sledované
-          {isAdo && (
-            <span className="inline-flex items-center" title="ADO nemá WIQL dotaz pro &quot;followed&quot; – jako náhradu používáme &quot;vytvořené mnou&quot;">
-              <Info className="h-3.5 w-3.5 text-muted-foreground" />
-            </span>
-          )}
-        </label>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox" checked={participant} onChange={e => setParticipant(e.target.checked)} className="rounded" />
-          Participant
-        </label>
-        <Separator className="my-2" />
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox" checked={includeClosed} onChange={e => setIncludeClosed(e.target.checked)} className="rounded" />
-          Včetně uzavřených
-        </label>
+      <h4 className="text-sm font-medium mb-3">Načíst tikety</h4>
+
+      <Tabs value={mode} onValueChange={v => setMode(v as 'my' | 'custom')}>
+        <TabsList>
+          <TabsTrigger value="my">Moje tikety</TabsTrigger>
+          <TabsTrigger value="custom">{isAdo ? 'WIQL dotaz' : 'JQL dotaz'}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="my">
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={assigned} onChange={e => setAssigned(e.target.checked)} className="rounded" />
+              Přiřazené mně
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={watched} onChange={e => setWatched(e.target.checked)} className="rounded" />
+              Sledované
+              {isAdo && (
+                <span className="inline-flex items-center" title="ADO nemá WIQL dotaz pro &quot;followed&quot; – jako náhradu používáme &quot;vytvořené mnou&quot;">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                </span>
+              )}
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={participant} onChange={e => setParticipant(e.target.checked)} className="rounded" />
+              Participant
+            </label>
+            <Separator className="my-2" />
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={includeClosed} onChange={e => setIncludeClosed(e.target.checked)} className="rounded" />
+              Včetně uzavřených
+            </label>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="custom">
+          <Textarea
+            className="font-mono text-xs min-h-[80px]"
+            value={customQuery}
+            onChange={e => setCustomQuery(e.target.value)}
+            placeholder={isAdo
+              ? "SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = 'MyProject' AND [System.State] <> 'Closed'"
+              : "project = MYPROJ AND status != Closed ORDER BY updated DESC"}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            {isAdo ? 'Zadejte WIQL dotaz' : 'Zadejte JQL dotaz'}
+          </p>
+        </TabsContent>
+      </Tabs>
+
+      {/* Přiřazení složky, kategorií a tagů */}
+      <div className="mt-3 space-y-3">
+        <div>
+          <Label className="text-xs">Složka</Label>
+          <Select value={folderId} onChange={e => setFolderId(e.target.value)} className="mt-1">
+            <option value="">-- Bez složky --</option>
+            {flatFolders.map(f => (
+              <option key={f.id} value={f.id}>{'\u00A0\u00A0'.repeat(f.depth) + f.name}</option>
+            ))}
+          </Select>
+        </div>
+
+        <div>
+          <Label className="text-xs">Kategorie</Label>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {selectedCategoryIds.map(id => {
+              const cat = categories.find((c: any) => c.id === id);
+              if (!cat) return null;
+              return (
+                <Badge key={cat.id} style={{ backgroundColor: cat.color + '20', color: cat.color, borderColor: cat.color }}>
+                  {cat.name}
+                  <button className="ml-1" onClick={() => setSelectedCategoryIds(prev => prev.filter(cid => cid !== id))}>
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              );
+            })}
+            {availableCategories.length > 0 && (
+              <Select
+                className="h-7 text-xs w-32"
+                onChange={e => {
+                  const val = Number(e.target.value);
+                  if (val) {
+                    setSelectedCategoryIds(prev => [...prev, val]);
+                    e.target.value = '';
+                  }
+                }}
+              >
+                <option value="">+ Přidat</option>
+                {availableCategories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <Label className="text-xs">Tagy</Label>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {selectedTagIds.map(id => {
+              const tag = tags.find((t: any) => t.id === id);
+              if (!tag) return null;
+              return (
+                <Badge key={tag.id} style={{ backgroundColor: tag.color + '20', color: tag.color, borderColor: tag.color }}>
+                  {tag.name}
+                  <button className="ml-1" onClick={() => setSelectedTagIds(prev => prev.filter(tid => tid !== id))}>
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              );
+            })}
+            {availableTags.length > 0 && (
+              <Select
+                className="h-7 text-xs w-32"
+                onChange={e => {
+                  const val = Number(e.target.value);
+                  if (val) {
+                    setSelectedTagIds(prev => [...prev, val]);
+                    e.target.value = '';
+                  }
+                }}
+              >
+                <option value="">+ Přidat</option>
+                {availableTags.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </Select>
+            )}
+          </div>
+        </div>
       </div>
+
       <Button
         size="sm"
         className="mt-3"
         onClick={handleFetch}
-        disabled={noneSelected || fetchMyTickets.isPending}
+        disabled={!canFetch || fetchMyTickets.isPending}
       >
         {fetchMyTickets.isPending ? (
           <>

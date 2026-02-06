@@ -35,12 +35,63 @@ router.get('/stats', (_req, res) => {
 
 router.get('/recent', (_req, res) => {
   const db = getDb();
-  const recent = db.prepare(`
-    SELECT id as ticket_id, title as ticket_title, external_id, 'imported' as action, synced_at as timestamp
+  const rows = db.prepare(`
+    SELECT id, title, external_id, status, priority, provider_type, assignee, external_tags, synced_at, updated_at
     FROM tickets
     ORDER BY synced_at DESC
     LIMIT 20
-  `).all();
+  `).all() as any[];
+
+  // Batch-load local tags and categories for all recent tickets
+  const ticketIds = rows.map(r => r.id);
+  const tagRows = ticketIds.length > 0
+    ? db.prepare(`
+        SELECT tlt.ticket_id, lt.id, lt.name, lt.color
+        FROM ticket_local_tags tlt
+        JOIN local_tags lt ON lt.id = tlt.tag_id
+        WHERE tlt.ticket_id IN (${ticketIds.map(() => '?').join(',')})
+      `).all(...ticketIds) as any[]
+    : [];
+  const catRows = ticketIds.length > 0
+    ? db.prepare(`
+        SELECT tc.ticket_id, c.id, c.name, c.color
+        FROM ticket_categories tc
+        JOIN categories c ON c.id = tc.category_id
+        WHERE tc.ticket_id IN (${ticketIds.map(() => '?').join(',')})
+      `).all(...ticketIds) as any[]
+    : [];
+
+  const tagsByTicket = new Map<number, { id: number; name: string; color: string }[]>();
+  for (const t of tagRows) {
+    if (!tagsByTicket.has(t.ticket_id)) tagsByTicket.set(t.ticket_id, []);
+    tagsByTicket.get(t.ticket_id)!.push({ id: t.id, name: t.name, color: t.color });
+  }
+  const catsByTicket = new Map<number, { id: number; name: string; color: string }[]>();
+  for (const c of catRows) {
+    if (!catsByTicket.has(c.ticket_id)) catsByTicket.set(c.ticket_id, []);
+    catsByTicket.get(c.ticket_id)!.push({ id: c.id, name: c.name, color: c.color });
+  }
+
+  const recent = rows.map(r => {
+    const action = r.updated_at > r.synced_at ? 'updated' : 'imported';
+    let externalTags: string[] = [];
+    try { externalTags = JSON.parse(r.external_tags || '[]'); } catch {}
+    return {
+      ticket_id: r.id,
+      ticket_title: r.title,
+      external_id: r.external_id,
+      action,
+      timestamp: r.synced_at,
+      status: r.status,
+      priority: r.priority,
+      provider_type: r.provider_type,
+      assignee: r.assignee,
+      external_tags: externalTags,
+      local_tags: tagsByTicket.get(r.id) || [],
+      categories: catsByTicket.get(r.id) || [],
+    };
+  });
+
   res.json(recent);
 });
 

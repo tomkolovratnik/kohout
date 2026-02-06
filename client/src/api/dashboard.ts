@@ -1,13 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { DashboardStats, RecentActivity, Ticket } from '@kohout/shared';
-
-export function useDashboardStats() {
-  return useQuery({
-    queryKey: ['dashboard-stats'],
-    queryFn: () => apiFetch<DashboardStats>('/dashboard/stats'),
-  });
-}
+import type { RecentActivity, Ticket } from '@kohout/shared';
 
 export function useRecentActivity() {
   return useQuery({

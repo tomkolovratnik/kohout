@@ -21,8 +21,12 @@ const fetchMyTicketsSchema = z.object({
   watched: z.boolean(),
   participant: z.boolean(),
   include_closed: z.boolean(),
-}).refine(data => data.assigned || data.watched || data.participant, {
-  message: 'Alespoň jedna volba (assigned/watched/participant) musí být zaškrtnuta',
+  custom_query: z.string().optional(),
+  folder_id: z.number().optional(),
+  tag_ids: z.array(z.number()).optional(),
+  category_ids: z.array(z.number()).optional(),
+}).refine(data => data.custom_query?.trim() || data.assigned || data.watched || data.participant, {
+  message: 'Zadejte vlastní dotaz nebo zaškrtněte alespoň jednu volbu (assigned/watched/participant)',
 });
 
 router.post('/fetch-my-tickets', validate(fetchMyTicketsSchema), async (req, res, next) => {

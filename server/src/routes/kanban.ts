@@ -38,13 +38,14 @@ router.get('/boards/:id', (req, res, next) => {
 const boardSchema = z.object({
   name: z.string().min(1),
   description: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
 });
 
 router.post('/boards', validate(boardSchema), (req, res, next) => {
   try {
     const db = getDb();
     const data = (req as any).validated;
-    const result = db.prepare('INSERT INTO kanban_boards (name, description) VALUES (?, ?)').run(data.name, data.description || null);
+    const result = db.prepare('INSERT INTO kanban_boards (name, description, color) VALUES (?, ?, ?)').run(data.name, data.description || null, data.color || null);
     const board = db.prepare('SELECT * FROM kanban_boards WHERE id = ?').get(Number(result.lastInsertRowid));
     res.status(201).json(board);
   } catch (err) {
@@ -57,7 +58,7 @@ router.put('/boards/:id', validate(boardSchema), (req, res, next) => {
     const db = getDb();
     const id = Number(req.params.id);
     const data = (req as any).validated;
-    db.prepare("UPDATE kanban_boards SET name = ?, description = ?, updated_at = datetime('now') WHERE id = ?").run(data.name, data.description || null, id);
+    db.prepare("UPDATE kanban_boards SET name = ?, description = ?, color = ?, updated_at = datetime('now') WHERE id = ?").run(data.name, data.description || null, data.color || null, id);
     const board = db.prepare('SELECT * FROM kanban_boards WHERE id = ?').get(id);
     res.json(board);
   } catch (err) {

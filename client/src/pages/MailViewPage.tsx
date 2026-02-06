@@ -79,7 +79,7 @@ export function MailViewPage() {
       } />
       <div className="flex-1 overflow-hidden">
         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <ResizablePanelGroup direction="horizontal">
+          <ResizablePanelGroup direction="horizontal" storageKey="kohout-tickets-split">
             <div className="h-full flex flex-col">
               <FilterBar foldersPanelOpen={foldersPanelOpen} onToggleFolders={() => setFoldersPanelOpen(p => !p)} />
               <div className="flex-1 overflow-hidden flex">

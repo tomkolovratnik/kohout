@@ -23,9 +23,11 @@ interface KanbanColumnProps {
   tickets: TicketPosition[];
   swimlaneId: number | null;
   showHeader?: boolean;
+  isDragActive?: boolean;
+  onCardClick?: (ticketId: number) => void;
 }
 
-export function KanbanColumn({ column, tickets, swimlaneId, showHeader = false }: KanbanColumnProps) {
+export function KanbanColumn({ column, tickets, swimlaneId, showHeader = false, isDragActive = false, onCardClick }: KanbanColumnProps) {
   const droppableId = `col-${column.id}-swim-${swimlaneId ?? 'none'}`;
   const { setNodeRef, isOver } = useDroppable({ id: droppableId });
 
@@ -51,8 +53,9 @@ export function KanbanColumn({ column, tickets, swimlaneId, showHeader = false }
       <div
         ref={setNodeRef}
         className={cn(
-          'flex-1 space-y-2 p-2 transition-colors min-h-[80px]',
-          isOver && 'bg-accent/40 rounded-lg',
+          'flex-1 space-y-2 p-2 transition-all duration-200 min-h-[80px]',
+          isOver && 'bg-primary/8 rounded-lg ring-2 ring-inset ring-primary/25',
+          !isOver && isDragActive && 'bg-muted/20 rounded-lg ring-1 ring-inset ring-border/20 ring-dashed',
           isOverWip && 'ring-2 ring-inset ring-red-300'
         )}
       >
@@ -68,9 +71,13 @@ export function KanbanColumn({ column, tickets, swimlaneId, showHeader = false }
               priority={ticket.priority}
               providerType={ticket.provider_type}
               assignee={ticket.assignee}
+              onCardClick={onCardClick}
             />
           ))}
         </SortableContext>
+        {isOver && (
+          <div className="h-10 rounded-md border-2 border-dashed border-primary/30 bg-primary/5 transition-all duration-200" />
+        )}
       </div>
     </div>
   );

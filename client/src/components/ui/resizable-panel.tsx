@@ -5,10 +5,21 @@ interface ResizablePanelGroupProps {
   direction: 'horizontal' | 'vertical';
   children: React.ReactNode;
   className?: string;
+  storageKey?: string;
+  defaultSplit?: number;
 }
 
-export function ResizablePanelGroup({ direction, children, className }: ResizablePanelGroupProps) {
-  const [splitPercent, setSplitPercent] = React.useState(35);
+export function ResizablePanelGroup({ direction, children, className, storageKey, defaultSplit = 35 }: ResizablePanelGroupProps) {
+  const [splitPercent, setSplitPercent] = React.useState(() => {
+    if (storageKey) {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const num = parseFloat(saved);
+        if (num >= 20 && num <= 80) return num;
+      }
+    }
+    return defaultSplit;
+  });
   const containerRef = React.useRef<HTMLDivElement>(null);
   const isDragging = React.useRef(false);
 
@@ -29,6 +40,12 @@ export function ResizablePanelGroup({ direction, children, className }: Resizabl
     };
 
     const handleMouseUp = () => {
+      if (isDragging.current && storageKey) {
+        setSplitPercent((current) => {
+          localStorage.setItem(storageKey, String(current));
+          return current;
+        });
+      }
       isDragging.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
@@ -40,7 +57,7 @@ export function ResizablePanelGroup({ direction, children, className }: Resizabl
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [direction]);
+  }, [direction, storageKey]);
 
   const childArray = React.Children.toArray(children);
 

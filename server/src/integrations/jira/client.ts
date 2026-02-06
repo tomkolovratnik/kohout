@@ -30,7 +30,7 @@ export class JiraClient {
   /** Detect whether this is v2 (Server/DC) or v3 (Cloud) */
   private async detectVersion(): Promise<'2' | '3'> {
     if (this.apiVersion) return this.apiVersion;
-    for (const ver of ['2', '3'] as const) {
+    for (const ver of ['3', '2'] as const) {
       const url = `${this.baseUrl}/rest/api/${ver}/myself`;
       const res = await this.fetch(url);
       if (res.ok) {
@@ -38,7 +38,7 @@ export class JiraClient {
         console.log(`Jira API version detected: v${ver} (${this.baseUrl})`);
         return ver;
       }
-      if (res.status === 404 && ver === '2') continue;
+      if (res.status === 404 && ver === '3') continue;
       const body = await res.text().catch(() => '');
       throw new Error(`Jira API ${res.status} ${res.statusText} (${url}): ${body}`);
     }

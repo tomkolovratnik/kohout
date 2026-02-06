@@ -1,5 +1,5 @@
 import { getDb } from '../db/connection.js';
-import { importTicket } from './ticket-service.js';
+import { importTicket, updateFtsIndex } from './ticket-service.js';
 import { JiraClient } from '../integrations/jira/client.js';
 import { AzureDevOpsClient } from '../integrations/azure-devops/client.js';
 import type { FetchMyTicketsRequest, FetchMyTicketsResult } from '@kohout/shared';
@@ -71,7 +71,6 @@ export async function fetchMyTickets(options: FetchMyTicketsRequest): Promise<Fe
       extra_config: extraConfig,
     });
 
-    const statusFilter = options.include_closed ? '' : ' AND status NOT IN (Done, Closed, Resolved)';
     const keySet = new Set<string>();
 
     const runJqlSearch = async (jql: string) => {
@@ -85,41 +84,52 @@ export async function fetchMyTickets(options: FetchMyTicketsRequest): Promise<Fe
       } while (pageToken);
     };
 
-    // Standard conditions (assignee, watcher) — always safe
-    const conditions: string[] = [];
-    if (options.assigned) conditions.push('assignee = currentUser()');
-    if (options.watched) conditions.push('watcher = currentUser()');
+    if (options.custom_query?.trim()) {
+      await runJqlSearch(options.custom_query.trim());
+    } else {
+      const statusFilter = options.include_closed ? '' : ' AND status NOT IN (Done, Closed, Resolved)';
 
-    if (conditions.length > 0) {
-      await runJqlSearch(`(${conditions.join(' OR ')})${statusFilter}`);
-    }
+      // Standard conditions (assignee, watcher) — always safe
+      const conditions: string[] = [];
+      if (options.assigned) conditions.push('assignee = currentUser()');
+      if (options.watched) conditions.push('watcher = currentUser()');
 
-    // "Request participants" exists only in JSM projects — run separately and skip on failure
-    if (options.participant) {
-      try {
-        await runJqlSearch(`"Request participants" = currentUser()${statusFilter}`);
-      } catch (err) {
-        console.warn('Participant query failed (field may not exist in this Jira instance):', (err as Error).message);
+      if (conditions.length > 0) {
+        await runJqlSearch(`(${conditions.join(' OR ')})${statusFilter}`);
+      }
+
+      // "Request participants" exists only in JSM projects — run separately and skip on failure
+      if (options.participant) {
+        try {
+          await runJqlSearch(`"Request participants" = currentUser()${statusFilter}`);
+        } catch (err) {
+          console.warn('Participant query failed (field may not exist in this Jira instance):', (err as Error).message);
+        }
       }
     }
 
     externalIds = [...keySet];
   } else if (provider.type === 'azure-devops') {
-    const conditions: string[] = [];
-    if (options.assigned) conditions.push('[System.AssignedTo] = @Me');
-    if (options.watched) conditions.push('[System.CreatedBy] = @Me');
-    if (options.participant) conditions.push('[System.ChangedBy] = @Me');
-
-    let wiql = `SELECT [System.Id] FROM WorkItems WHERE (${conditions.join(' OR ')})`;
-    if (!options.include_closed) {
-      wiql += " AND [System.State] NOT IN ('Closed','Done','Resolved','Removed')";
-    }
-
     const client = new AzureDevOpsClient({
       base_url: provider.base_url,
       pat_token: provider.pat_token,
       extra_config: extraConfig,
     });
+
+    let wiql: string;
+    if (options.custom_query?.trim()) {
+      wiql = options.custom_query.trim();
+    } else {
+      const conditions: string[] = [];
+      if (options.assigned) conditions.push('[System.AssignedTo] = @Me');
+      if (options.watched) conditions.push('[System.CreatedBy] = @Me');
+      if (options.participant) conditions.push('[System.ChangedBy] = @Me');
+
+      wiql = `SELECT [System.Id] FROM WorkItems WHERE (${conditions.join(' OR ')})`;
+      if (!options.include_closed) {
+        wiql += " AND [System.State] NOT IN ('Closed','Done','Resolved','Removed')";
+      }
+    }
 
     const ids = await client.queryWorkItems(wiql);
     externalIds = ids.map(id => String(id));
@@ -131,10 +141,32 @@ export async function fetchMyTickets(options: FetchMyTicketsRequest): Promise<Fe
   let updated = 0;
   let failed = 0;
 
+  const hasFolderId = options.folder_id != null;
+  const hasTagIds = options.tag_ids && options.tag_ids.length > 0;
+  const hasCategoryIds = options.category_ids && options.category_ids.length > 0;
+
+  const stmtFolder = hasFolderId ? db.prepare('UPDATE tickets SET folder_id = ? WHERE id = ?') : null;
+  const stmtTag = hasTagIds ? db.prepare('INSERT OR IGNORE INTO ticket_local_tags (ticket_id, tag_id) VALUES (?, ?)') : null;
+  const stmtCategory = hasCategoryIds ? db.prepare('INSERT OR IGNORE INTO ticket_categories (ticket_id, category_id) VALUES (?, ?)') : null;
+
   for (const externalId of externalIds) {
     try {
       const existing = db.prepare('SELECT id FROM tickets WHERE provider_id = ? AND external_id = ?').get(options.provider_id, externalId);
-      await importTicket(options.provider_id, externalId);
+      const ticket = await importTicket(options.provider_id, externalId);
+
+      if (stmtFolder) stmtFolder.run(options.folder_id, ticket.id);
+      if (stmtTag) {
+        for (const tagId of options.tag_ids!) {
+          stmtTag.run(ticket.id, tagId);
+        }
+        updateFtsIndex(ticket.id);
+      }
+      if (stmtCategory) {
+        for (const catId of options.category_ids!) {
+          stmtCategory.run(ticket.id, catId);
+        }
+      }
+
       if (existing) {
         updated++;
       } else {

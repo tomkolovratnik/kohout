@@ -105,6 +105,7 @@ export interface KanbanBoard {
   id: number;
   name: string;
   description: string | null;
+  color: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -165,6 +166,13 @@ export interface RecentActivity {
   external_id: string;
   action: 'imported' | 'updated' | 'commented' | 'noted';
   timestamp: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  provider_type: ProviderType;
+  assignee: string | null;
+  external_tags: string[];
+  local_tags: { id: number; name: string; color: string }[];
+  categories: { id: number; name: string; color: string }[];
 }
 
 // ─── App Settings ────────────────────────────────────────────────────
@@ -182,6 +190,10 @@ export interface FetchMyTicketsRequest {
   watched: boolean;
   participant: boolean;
   include_closed: boolean;
+  custom_query?: string;
+  folder_id?: number;
+  tag_ids?: number[];
+  category_ids?: number[];
 }
 
 export interface FetchMyTicketsResult {

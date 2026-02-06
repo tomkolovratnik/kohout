@@ -33,8 +33,17 @@ export function useKanbanBoard(id: number | null) {
 export function useCreateBoard() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name: string; description?: string }) =>
+    mutationFn: (data: { name: string; description?: string; color?: string }) =>
       apiFetch<KanbanBoard>('/kanban/boards', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['kanban-boards'] }),
+  });
+}
+
+export function useUpdateBoard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: number; name: string; description?: string; color?: string | null }) =>
+      apiFetch<KanbanBoard>(`/kanban/boards/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['kanban-boards'] }),
   });
 }

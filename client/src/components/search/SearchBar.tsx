@@ -10,8 +10,10 @@ export function SearchBar() {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const selectTicket = useUiStore(s => s.selectTicket);
 
@@ -44,12 +46,44 @@ export function SearchBar() {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
+  // Reset highlight when results change
+  useEffect(() => {
+    setHighlightedIndex(-1);
+  }, [results]);
+
   const handleSelect = useCallback((ticketId: number) => {
     selectTicket(ticketId);
     navigate('/tickets');
     setOpen(false);
     setQuery('');
+    setHighlightedIndex(-1);
   }, [selectTicket, navigate]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!open || results.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex(i => {
+        const next = i < results.length - 1 ? i + 1 : 0;
+        listRef.current?.children[next]?.scrollIntoView({ block: 'nearest' });
+        return next;
+      });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex(i => {
+        const next = i > 0 ? i - 1 : results.length - 1;
+        listRef.current?.children[next]?.scrollIntoView({ block: 'nearest' });
+        return next;
+      });
+    } else if (e.key === 'Enter' && highlightedIndex >= 0) {
+      e.preventDefault();
+      handleSelect((results[highlightedIndex] as any).ticket_id);
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+      setHighlightedIndex(-1);
+    }
+  }, [open, results, highlightedIndex, handleSelect]);
 
   return (
     <div ref={ref} className="relative flex-1 max-w-3xl">
@@ -59,8 +93,9 @@ export function SearchBar() {
         placeholder="Hledat tikety..."
         className="pl-8 pr-16 bg-secondary/50"
         value={query}
-        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        onChange={e => { setQuery(e.target.value); setOpen(true); setHighlightedIndex(-1); }}
         onFocus={() => query.length >= 2 && setOpen(true)}
+        onKeyDown={handleKeyDown}
       />
       <div className="absolute right-2.5 top-2 flex items-center gap-1">
         {query ? (
@@ -75,15 +110,16 @@ export function SearchBar() {
       </div>
 
       {open && debouncedQuery.length >= 2 && (
-        <div className="absolute top-full left-0 right-0 mt-1.5 bg-popover/95 backdrop-blur-md ring-1 ring-border/40 rounded-lg shadow-[var(--shadow-card-hover)] z-50 max-h-80 overflow-auto">
+        <div ref={listRef} className="absolute top-full left-0 right-0 mt-1.5 bg-popover/95 backdrop-blur-md ring-1 ring-border/40 rounded-lg shadow-[var(--shadow-card-hover)] z-50 max-h-80 overflow-auto">
           {results.length === 0 ? (
             <div className="p-3 text-sm text-muted-foreground">Žádné výsledky</div>
           ) : (
-            results.map((r: any) => (
+            results.map((r: any, index: number) => (
               <button
                 key={r.ticket_id}
-                className="w-full text-left px-3 py-2 hover:bg-accent/60 transition-colors rounded-lg"
+                className={`w-full text-left px-3 py-2 hover:bg-accent/60 transition-colors rounded-lg ${index === highlightedIndex ? 'bg-accent/60' : ''}`}
                 onClick={() => handleSelect(r.ticket_id)}
+                onMouseEnter={() => setHighlightedIndex(index)}
               >
                 <div className="flex items-center gap-2">
                   {r.external_id && (

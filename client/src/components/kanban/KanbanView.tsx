@@ -1,27 +1,40 @@
 import { useState } from 'react';
-import { DndContext, closestCorners, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, closestCenter, DragEndEvent, DragStartEvent, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useKanbanBoard, useMoveTicket, useAddTicketToBoard } from '@/api/kanban';
 import { useTickets } from '@/api/tickets';
 import { KanbanSwimlane } from './KanbanSwimlane';
 import { KanbanConfig } from './KanbanConfig';
+import { KanbanCardContent } from './KanbanCard';
+import { TicketDetail } from '@/components/tickets/TicketDetail';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Settings, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useUiStore } from '@/stores/ui-store';
 import { toast } from 'sonner';
 
 interface KanbanViewProps {
   boardId: number;
+  configOpen?: boolean;
+  onConfigOpenChange?: (open: boolean) => void;
+  addTicketOpen?: boolean;
+  onAddTicketOpenChange?: (open: boolean) => void;
 }
 
-export function KanbanView({ boardId }: KanbanViewProps) {
+export function KanbanView({ boardId, configOpen, onConfigOpenChange, addTicketOpen, onAddTicketOpenChange }: KanbanViewProps) {
   const { data: board } = useKanbanBoard(boardId);
   const moveTicket = useMoveTicket();
   const addTicketToBoard = useAddTicketToBoard();
-  const [showConfig, setShowConfig] = useState(false);
-  const [showAddTicket, setShowAddTicket] = useState(false);
+  const [showConfigInternal, setShowConfigInternal] = useState(false);
+  const [showAddTicketInternal, setShowAddTicketInternal] = useState(false);
+  const showConfig = configOpen ?? showConfigInternal;
+  const setShowConfig = onConfigOpenChange ?? setShowConfigInternal;
+  const showAddTicket = addTicketOpen ?? showAddTicketInternal;
+  const setShowAddTicket = onAddTicketOpenChange ?? setShowAddTicketInternal;
   const [addTicketId, setAddTicketId] = useState('');
+  const [showTicketDetail, setShowTicketDetail] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const selectTicket = useUiStore(s => s.selectTicket);
 
   const { data: ticketsData } = useTickets({ per_page: 200 });
   const allTickets = ticketsData?.data || [];
@@ -38,26 +51,53 @@ export function KanbanView({ boardId }: KanbanViewProps) {
   const ticketIdsOnBoard = new Set(positions.map(p => p.ticket_id));
   const availableTickets = allTickets.filter(t => !ticketIdsOnBoard.has(t.id));
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id));
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
     const posId = Number(String(active.id).replace('pos-', ''));
     const overId = String(over.id);
 
-    // Determine target column and swimlane from droppable
-    if (overId.startsWith('col-')) {
-      const parts = overId.split('-');
-      // col-{colId}-swim-{swimId|none}
-      const colId = Number(parts[1]);
-      const swimId = parts[3] === 'none' ? undefined : Number(parts[3]);
+    let targetColId: number | undefined;
+    let targetSwimId: number | undefined;
+    let targetSortOrder = 0;
 
+    if (overId.startsWith('col-')) {
+      // Dropped on column droppable area
+      const parts = overId.split('-');
+      targetColId = Number(parts[1]);
+      targetSwimId = parts[3] === 'none' ? undefined : Number(parts[3]);
+      // Place at end of column
+      const colTickets = positions.filter(p =>
+        p.column_id === targetColId &&
+        (targetSwimId ? p.swimlane_id === targetSwimId : p.swimlane_id === null)
+      );
+      targetSortOrder = colTickets.length > 0
+        ? Math.max(...colTickets.map(p => p.sort_order)) + 1
+        : 0;
+    } else if (overId.startsWith('pos-')) {
+      // Dropped on another card — resolve its column/swimlane
+      const overPosId = Number(overId.replace('pos-', ''));
+      const targetPos = positions.find(p => p.id === overPosId);
+      if (targetPos) {
+        targetColId = targetPos.column_id;
+        targetSwimId = targetPos.swimlane_id ?? undefined;
+        targetSortOrder = targetPos.sort_order;
+      }
+    }
+
+    if (targetColId !== undefined) {
       moveTicket.mutate({
         positionId: posId,
         boardId,
-        column_id: colId,
-        swimlane_id: swimId,
-        sort_order: 0,
+        column_id: targetColId,
+        swimlane_id: targetSwimId,
+        sort_order: targetSortOrder,
       });
     }
   };
@@ -83,23 +123,15 @@ export function KanbanView({ boardId }: KanbanViewProps) {
     }
   };
 
+  const handleCardClick = (ticketId: number) => {
+    selectTicket(ticketId);
+    setShowTicketDetail(true);
+  };
+
   const hasSwimlanes = swimlanes.length > 0;
 
   return (
     <div className="h-full flex flex-col">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 shadow-[0_1px_0_0_var(--color-border)] shrink-0">
-        <h3 className="text-base font-semibold font-heading">{board.name}</h3>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowAddTicket(true)}>
-            <Plus className="h-3 w-3 mr-1" /> Přidat tiket
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowConfig(true)}>
-            <Settings className="h-3 w-3 mr-1" /> Konfigurace
-          </Button>
-        </div>
-      </div>
-
       {columns.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
           Přidejte sloupce v konfiguraci
@@ -129,7 +161,7 @@ export function KanbanView({ boardId }: KanbanViewProps) {
           </div>
 
           {/* Board content */}
-          <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div className="flex-1">
               {hasSwimlanes ? (
                 <>
@@ -139,6 +171,8 @@ export function KanbanView({ boardId }: KanbanViewProps) {
                       swimlane={sw}
                       columns={columns}
                       tickets={positions.filter(p => p.swimlane_id === sw.id)}
+                      isDragActive={!!activeId}
+                      onCardClick={handleCardClick}
                     />
                   ))}
                   {/* Tickets without swimlane */}
@@ -147,6 +181,8 @@ export function KanbanView({ boardId }: KanbanViewProps) {
                       swimlane={{ id: 0, board_id: boardId, name: 'Nepřiřazené', sort_order: 999, color: null, group_by: null, group_value: null } as any}
                       columns={columns}
                       tickets={positions.filter(p => p.swimlane_id === null)}
+                      isDragActive={!!activeId}
+                      onCardClick={handleCardClick}
                     />
                   )}
                 </>
@@ -155,9 +191,30 @@ export function KanbanView({ boardId }: KanbanViewProps) {
                   swimlane={null}
                   columns={columns}
                   tickets={positions}
+                  isDragActive={!!activeId}
+                  onCardClick={handleCardClick}
                 />
               )}
             </div>
+            <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
+              {activeId ? (() => {
+                const posId = Number(activeId.replace('pos-', ''));
+                const pos = positions.find(p => p.id === posId);
+                if (!pos) return null;
+                return (
+                  <div className="w-[250px]">
+                    <KanbanCardContent
+                      title={pos.title}
+                      externalId={pos.external_id}
+                      priority={pos.priority}
+                      providerType={pos.provider_type}
+                      assignee={pos.assignee}
+                      isOverlay
+                    />
+                  </div>
+                );
+              })() : null}
+            </DragOverlay>
           </DndContext>
         </div>
       )}
@@ -169,6 +226,15 @@ export function KanbanView({ boardId }: KanbanViewProps) {
         columns={columns}
         swimlanes={swimlanes}
       />
+
+      <Dialog open={showTicketDetail} onOpenChange={(open) => {
+        setShowTicketDetail(open);
+        if (!open) selectTicket(null);
+      }}>
+        <DialogContent className="w-full max-w-3xl h-[85vh] p-0 overflow-hidden">
+          <TicketDetail />
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showAddTicket} onOpenChange={setShowAddTicket}>
         <DialogContent>
