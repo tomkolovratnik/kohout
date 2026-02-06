@@ -15,6 +15,7 @@
     "dotenv": "^16.4.0",
     "express": "^5.1.0",
     "sql.js-fts5": "^1.4.0",
+    "undici": "^7.20.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
