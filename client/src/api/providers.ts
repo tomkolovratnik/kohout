@@ -37,7 +37,7 @@ export function useDeleteProvider() {
 
 export function useTestConnection() {
   return useMutation({
-    mutationFn: (id: number) => apiFetch<{ success: boolean }>(`/settings/providers/${id}/test`, { method: 'POST' }),
+    mutationFn: (id: number) => apiFetch<{ success: boolean; error?: string }>(`/settings/providers/${id}/test`, { method: 'POST' }),
   });
 }
 

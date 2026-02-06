@@ -32,6 +32,7 @@ export function SettingsPage() {
     username: '',
     organization: '',
     project: '',
+    skip_ssl: false,
   });
 
   const handleCreate = async () => {
@@ -41,6 +42,7 @@ export function SettingsPage() {
         extra_config.organization = form.organization;
         extra_config.project = form.project;
       }
+      if (form.skip_ssl) extra_config.skip_ssl = 'true';
       await createProvider.mutateAsync({
         name: form.name,
         type: form.type,
@@ -50,7 +52,7 @@ export function SettingsPage() {
         extra_config,
       } as any);
       setShowAdd(false);
-      setForm({ name: '', type: 'jira', base_url: '', pat_token: '', username: '', organization: '', project: '' });
+      setForm({ name: '', type: 'jira', base_url: '', pat_token: '', username: '', organization: '', project: '', skip_ssl: false });
       toast.success('Provider vytvořen');
     } catch (e: any) {
       toast.error(e.message);
@@ -62,7 +64,11 @@ export function SettingsPage() {
     try {
       const result = await testConnection.mutateAsync(id);
       setTestResults(r => ({ ...r, [id]: result.success }));
-      toast[result.success ? 'success' : 'error'](result.success ? 'Připojení úspěšné' : 'Připojení selhalo');
+      if (result.success) {
+        toast.success('Připojení úspěšné');
+      } else {
+        toast.error(result.error ? `Připojení selhalo: ${result.error}` : 'Připojení selhalo');
+      }
     } catch (e: any) {
       setTestResults(r => ({ ...r, [id]: false }));
       toast.error(e.message);
@@ -116,6 +122,9 @@ export function SettingsPage() {
                   <p className="text-sm text-muted-foreground">
                     Organizace: {p.extra_config.organization} / Projekt: {p.extra_config.project}
                   </p>
+                )}
+                {p.extra_config?.skip_ssl === 'true' && (
+                  <p className="text-sm text-amber-600 dark:text-amber-400">SSL ověření přeskočeno</p>
                 )}
                 <FetchMyTicketsSection providerId={p.id} providerType={p.type} />
               </CardContent>
@@ -185,6 +194,11 @@ export function SettingsPage() {
                   </div>
                 </>
               )}
+              <label className="flex items-center gap-2 text-sm cursor-pointer pt-2">
+                <input type="checkbox" checked={form.skip_ssl} onChange={e => setForm(f => ({ ...f, skip_ssl: e.target.checked }))} className="rounded" />
+                Přeskočit ověření SSL certifikátu
+                <span className="text-muted-foreground">(firemní proxy)</span>
+              </label>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAdd(false)}>Zrušit</Button>

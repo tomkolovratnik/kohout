@@ -138,6 +138,7 @@ router.post('/providers/:id/test', async (req, res, next) => {
   } catch (err: any) {
     const cause = err.cause;
     const detail = cause?.message || cause || err.message;
+    console.error('Connection test failed:', detail);
     res.json({ success: false, error: String(detail) });
   }
 });
