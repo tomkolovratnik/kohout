@@ -1,6 +1,6 @@
 {
   "name": "kohout",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Personal ticket aggregation tool for Jira and Azure DevOps",
   "workspaces": [
     "shared",
